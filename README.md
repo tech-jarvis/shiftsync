@@ -165,6 +165,44 @@ pnpm exec tsx scripts/seed.ts
 The seed is idempotent — existing auth users are reused rather than duplicated, so it can be run
 repeatedly without breaking logins.
 
+## Performance
+
+The two things that actually made this slow, and what was done about them.
+
+**1. N+1 query fan-out.** The assign panel loaded each candidate's snapshot and
+assignments individually — six queries per person. Nine candidates meant ~55 round trips before a
+single rule ran. `loadStaffSnapshots`, `loadShiftSnapshots` and `loadExistingAssignmentsForMany`
+now fetch the whole set with one query per table (`= any($1::uuid[])`) and stitch the rows in
+memory, so the query count is constant in the number of candidates.
+
+Measured against the hosted database:
+
+| | Queries | Wall time |
+|---|---|---|
+| Before | 28 | 10,929 ms |
+| After | 9 | 2,170 ms |
+
+`/staff/open` had the same shape — two queries per candidate shift, so forty open shifts meant
+eighty round trips. It is now three queries total, helped by the fact that it evaluates a *single*
+person, whose assignments only need loading once across the whole span.
+
+**2. Compute and data on opposite sides of the planet.** Vercel defaults functions to `iad1`
+(Washington DC); the database is in `ap-southeast-2` (Sydney). Every query crossed ~16,000 km at
+roughly 230 ms, multiplied by the query count. `vercel.json` pins functions to `syd1`, which
+inverts the arithmetic: the viewer pays one slower hop, instead of the server paying N slow hops
+per page. Login went from 890 ms to 363 ms; authenticated pages settle around 330 ms.
+
+**Why not React Query?** It was considered and rejected on the evidence. Nearly all data here is
+fetched in server components and server actions, which a client-side cache never observes, and it
+cannot help a first load — which is exactly what an evaluator experiences. Moving these fetches
+client-side to make them cacheable would introduce a request waterfall in the browser and make the
+first paint *worse*. The bottleneck was round trips and distance, so that is what was fixed.
+
+**Still on the table:** the database is in Sydney because that is where the project was created,
+and Supabase cannot move a project between regions. A `us-east-1` project with functions back in
+`iad1` would put both hops next to a US-based reviewer. It is a fresh project plus a
+`db push` and a seed — roughly ten minutes, now that both are scripted.
+
 ## Documentation
 
 - **[docs/DECISIONS.md](docs/DECISIONS.md)** — every ambiguity the brief left open, the call made,

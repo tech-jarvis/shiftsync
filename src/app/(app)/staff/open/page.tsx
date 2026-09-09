@@ -1,5 +1,10 @@
 import { sql } from "@/db/client";
-import { loadExistingAssignments, loadSettings, loadShiftSnapshot, loadStaffSnapshot } from "@/domain/scheduling/hydrate";
+import {
+  loadExistingAssignments,
+  loadSettings,
+  loadShiftSnapshots,
+  loadStaffSnapshot,
+} from "@/domain/scheduling/hydrate";
 import { requireUser } from "@/lib/auth";
 import { validateAssignment } from "@/rules";
 import { OpenShifts, type OpenShiftView } from "@/components/staff/OpenShifts";
@@ -55,20 +60,33 @@ export default async function OpenShiftsPage() {
      limit 40
   `;
 
-  const staff = await loadStaffSnapshot(sql, user.profileId);
+  // Batched deliberately. Evaluating each candidate shift on its own cost two
+  // queries apiece, so forty open shifts meant eighty round trips. Here it is
+  // one staff snapshot, one query for every shift, and -- because this is a
+  // SINGLE person -- one assignment load spanning them all.
+  const candidateIds = [...unfilled, ...dropped].map((row) => row.shiftId);
 
-  const evaluate = async (
-    shiftId: string,
-    requestId: string | null,
-  ): Promise<OpenShiftView | null> => {
-    const shift = await loadShiftSnapshot(sql, shiftId);
+  const [staff, shiftSnapshots] = await Promise.all([
+    loadStaffSnapshot(sql, user.profileId),
+    loadShiftSnapshots(sql, candidateIds),
+  ]);
+
+  const spans = [...shiftSnapshots.values()];
+  const existing =
+    spans.length > 0
+      ? await loadExistingAssignments(sql, {
+          staffId: user.profileId,
+          // The widest span across all candidates. loadExistingAssignments pads
+          // this by the context window, so the result is a superset valid for
+          // every individual shift.
+          aroundStart: Math.min(...spans.map((s) => s.startsAt)),
+          aroundEnd: Math.max(...spans.map((s) => s.endsAt)),
+        })
+      : [];
+
+  const evaluate = (shiftId: string, requestId: string | null): OpenShiftView | null => {
+    const shift = shiftSnapshots.get(shiftId);
     if (!shift || !staff) return null;
-
-    const existing = await loadExistingAssignments(sql, {
-      staffId: user.profileId,
-      aroundStart: shift.startsAt,
-      aroundEnd: shift.endsAt,
-    });
 
     const result = validateAssignment({ staff, shift, existing, settings });
     if (result.blocked) return null;
@@ -87,10 +105,10 @@ export default async function OpenShiftsPage() {
     };
   };
 
-  const candidates = await Promise.all([
+  const candidates = [
     ...unfilled.map((row) => evaluate(row.shiftId, null)),
     ...dropped.map((row) => evaluate(row.shiftId, row.requestId)),
-  ]);
+  ];
 
   const available = candidates
     .filter((s): s is OpenShiftView => s !== null)

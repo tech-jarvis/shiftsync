@@ -1,7 +1,12 @@
 import { sql } from "@/db/client";
 import type { Tx } from "@/db/transaction";
 import { validateAssignment, type HoursProjection, type Violation } from "@/rules";
-import { loadExistingAssignments, loadSettings, loadShiftSnapshot, loadStaffSnapshot } from "./hydrate";
+import {
+  loadExistingAssignmentsForMany,
+  loadSettings,
+  loadShiftSnapshot,
+  loadStaffSnapshots,
+} from "./hydrate";
 
 /**
  * Everyone who could plausibly work a shift, each with the full consequence of
@@ -59,16 +64,26 @@ export async function assignmentOptions(
      order by p.full_name
   `;
 
+  // Everything the whole candidate set needs, in a fixed 6 queries rather than
+  // 6 per person. Evaluating nine candidates one at a time meant ~55 round
+  // trips; over any real app-to-database distance that is seconds of pure
+  // network before a single rule runs.
+  const staffIds = candidates.map((c) => c.id);
+  const [snapshots, assignmentsByStaff] = await Promise.all([
+    loadStaffSnapshots(db, staffIds),
+    loadExistingAssignmentsForMany(db, {
+      staffIds,
+      aroundStart: shift.startsAt,
+      aroundEnd: shift.endsAt,
+    }),
+  ]);
+
   const evaluated = await Promise.all(
     candidates.map(async ({ id, assigned }): Promise<AssignmentOption | null> => {
-      const staff = await loadStaffSnapshot(db, id);
+      const staff = snapshots.get(id);
       if (!staff) return null;
 
-      const existing = await loadExistingAssignments(db, {
-        staffId: id,
-        aroundStart: shift.startsAt,
-        aroundEnd: shift.endsAt,
-      });
+      const existing = assignmentsByStaff.get(id) ?? [];
 
       // For someone already on the shift, validate as though they were not --
       // otherwise they would show as double-booked against themselves.
