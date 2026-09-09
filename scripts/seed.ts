@@ -261,16 +261,46 @@ async function seedPeople() {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
+  // IDEMPOTENCY: wipe() truncates `profiles`, but auth.users lives in the auth
+  // schema and survives. So on a second `pnpm seed` without a db reset, every
+  // createUser would fail with "already been registered" -- and if that error
+  // is merely swallowed, every profile is written with a NULL auth_user_id and
+  // nobody can log in at all. Existing auth users are therefore looked up and
+  // REUSED, with their password reset to the demo one.
+  const existingByEmail = new Map<string, string>();
+  const { data: existing, error: listError } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+  if (listError) throw listError;
+  for (const user of existing.users) {
+    if (user.email) existingByEmail.set(user.email, user.id);
+  }
+
   for (const person of PEOPLE) {
     // A real login for every seeded person, so the evaluator can sign in as any
-    // role. profiles.auth_user_id is nullable by design, but the demo wants
-    // every account reachable.
-    const { data, error } = await admin.auth.admin.createUser({
-      email: person.email,
-      password: DEMO_PASSWORD,
-      email_confirm: true,
-    });
-    if (error && !/already been registered/i.test(error.message)) throw error;
+    // role and switch between them freely.
+    let authUserId = existingByEmail.get(person.email) ?? null;
+
+    if (authUserId) {
+      const { error } = await admin.auth.admin.updateUserById(authUserId, {
+        password: DEMO_PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+    } else {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: person.email,
+        password: DEMO_PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      authUserId = data.user?.id ?? null;
+    }
+
+    if (!authUserId) {
+      throw new Error(`Could not resolve an auth user for ${person.email}`);
+    }
 
     const [row] = await sql<{ id: string }[]>`
       insert into profiles (
@@ -278,7 +308,7 @@ async function seedPeople() {
         desired_weekly_hours, hourly_rate, email_simulation_enabled
       )
       values (
-        ${data?.user?.id ?? null}, ${person.name}, ${person.email}, ${person.role},
+        ${authUserId}, ${person.name}, ${person.email}, ${person.role},
         ${person.timezone}, ${person.desiredWeeklyHours ?? null}, ${person.hourlyRate},
         ${person.role !== "staff"}
       )

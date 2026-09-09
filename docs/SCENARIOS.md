@@ -132,19 +132,23 @@ invariant belongs to the schema rather than to our code being careful.
 > *An employee claims they never get Saturday night shifts. How does a manager verify or refute
 > this?*
 
-**Insights → Fairness.** Premium shifts are Friday and Saturday evenings, tagged in each location's
-own timezone. On the seeded data, over 4 weeks:
+**Insights → Fairness**, signed in as **Marcus**. Premium shifts are Friday and Saturday evenings,
+tagged in each location's own timezone. With the 4-week filter (which spans the four preceding
+weeks plus the current one) at his two locations:
 
 | Staff | Premium shifts | Vs fair share |
 |---|---|---|
-| Rina Okafor | 8 | 2.09× |
-| Noor Haddad | 7 | 1.83× |
-| Hannah Pryce | 6 | 1.57× |
+| Rina Okafor | 8 | 2.18× |
+| Noor Haddad | 7 | 1.91× |
+| Hannah Pryce | 6 | 1.64× |
+| Kenji Watanabe | 1 | 0.27× |
 | **Aisha Bello** | **0** | **0.00×** |
 | Jamal Osei | 0 | 0.00× |
 
+The figures are scoped to the signed-in manager's locations, so Priya sees the Eastern pair instead.
+
 Aisha's complaint is **true**, and the manager can see it in seconds rather than argue about it. A
-Gini coefficient sits alongside the raw counts — 0.46 on this data, *"concentrated in a few
+Gini coefficient sits alongside the raw counts — 0.50 on this data, *"concentrated in a few
 people"* — but never instead of them: a single number settles no argument, though it does say
 whether there is one.
 
