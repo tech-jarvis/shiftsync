@@ -36,6 +36,16 @@
   /* Premium (Fri/Sat evening) shifts, for the fairness view. */
   --premium: #6b3fbf;
   --premium-soft: #f1ebfd;
+
+  /* Chart FILL tokens -- deliberately separate from the text/severity tokens
+     above. A fill and a label have different jobs and sit in different
+     lightness bands; reusing text colors as fills makes dark mode glare.
+     Validated with the dataviz palette checker: lightness band, chroma floor,
+     CVD separation (worst adjacent dE 27.8 protan), and contrast all pass. */
+  --chart-regular: #1f5fd0;
+  --chart-overtime: #b25a06;
+  --chart-premium: #6b3fbf;
+  --chart-track: #e8ebef;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +74,14 @@
 
     --premium: #b492f3;
     --premium-soft: #241a3a;
+
+    /* Dark fills are re-stepped, not flipped: the light values sit at L 0.71-0.78,
+       outside the dark band of 0.48-0.67, and glare against a dark surface.
+       These are validated separately against the dark surface. */
+    --chart-regular: #3b7fd4;
+    --chart-overtime: #c47a2c;
+    --chart-premium: #8a5fd0;
+    --chart-track: #262d36;
   }
 }
 
@@ -88,6 +106,10 @@
   --color-ok-soft: var(--ok-soft);
   --color-premium: var(--premium);
   --color-premium-soft: var(--premium-soft);
+  --color-chart-regular: var(--chart-regular);
+  --color-chart-overtime: var(--chart-overtime);
+  --color-chart-premium: var(--chart-premium);
+  --color-chart-track: var(--chart-track);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
