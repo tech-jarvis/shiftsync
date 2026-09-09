@@ -151,9 +151,8 @@ create policy profiles_self_update on profiles
   for update using (id = current_profile_id())
   with check (id = current_profile_id());
 
-revoke update on profiles from authenticated;
-grant  update (full_name, home_timezone, desired_weekly_hours, email_simulation_enabled)
-  on profiles to authenticated;
+-- The column-level half of this rule lives in the grants migration, where the
+-- whole privilege surface can be read at once.
 
 create policy profiles_admin_write on profiles
   for all using (is_admin()) with check (is_admin());
