@@ -1,5 +1,8 @@
 # ShiftSync
 
+**Live: https://shiftsync-seven.vercel.app** — sign in with one click; every account is listed on
+the login screen.
+
 Multi-location staff scheduling for **Coastal Eats** — 4 restaurants across 2 time zones.
 
 Built for the Priority Soft full-stack assessment. The brief weights 60% of the grade on
@@ -117,19 +120,20 @@ made in psql or Studio. An audit row you can forget to write is not an audit tra
 
 ## Deployment
 
+**Deployed: https://shiftsync-seven.vercel.app**
+
 The hosted Supabase backend is **live and seeded**: project `znitqahbagliydjhgakv`, region
 ap-southeast-2. All 9 migrations are applied, the seed has run, and it was verified end to end —
 sign-in works, RLS scopes correctly (a manager sees only their locations; staff see published
 shifts at their certified locations and no drafts), and the exclusion constraint rejects an
 overlapping assignment with `SQLSTATE 23P01`.
 
-What remains is pointing a Vercel deployment at it.
+The Vercel deployment is live against it, and was verified in production end to end: sign-in,
+the schedule with correct location scoping and timezones, the Insights dashboard (which uses the
+direct Postgres connection), and a real assignment write exercising the per-staff advisory locks.
 
-```bash
-vercel --prod
-```
-
-Four environment variables, all present in `.env.hosted` (gitignored) — copy them across:
+Four environment variables, all present in `.env.hosted` (gitignored) and already set on Vercel
+across production, preview and development:
 
 | Variable | Notes |
 |---|---|
