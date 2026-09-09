@@ -117,37 +117,49 @@ made in psql or Studio. An audit row you can forget to write is not an audit tra
 
 ## Deployment
 
-Not deployed — the Supabase account had hit its free-project limit at build time, so this runs
-locally. To deploy:
+The hosted Supabase backend is **live and seeded**: project `znitqahbagliydjhgakv`, region
+ap-southeast-2. All 9 migrations are applied, the seed has run, and it was verified end to end —
+sign-in works, RLS scopes correctly (a manager sees only their locations; staff see published
+shifts at their certified locations and no drafts), and the exclusion constraint rejects an
+overlapping assignment with `SQLSTATE 23P01`.
+
+What remains is pointing a Vercel deployment at it.
 
 ```bash
-# 1. Create the hosted project
-supabase projects create shiftsync --org-id <ORG_ID> --db-password '<STRONG_PASSWORD>' --region us-east-1
-
-# 2. Link and push the schema
-supabase link --project-ref <PROJECT_REF>
-supabase db push
-
-# 3. Seed it (point .env.local at the hosted project first)
-pnpm seed
-
-# 4. Deploy the app
 vercel --prod
 ```
 
-Vercel needs three environment variables, all printed by `supabase status` or the dashboard:
+Four environment variables, all present in `.env.hosted` (gitignored) — copy them across:
 
-| Variable | Where it comes from |
+| Variable | Notes |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Project API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` / publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | service-role key — **server-side only**, never expose it |
-| `DATABASE_URL` | Postgres connection string (used for transactions and advisory locks) |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://znitqahbagliydjhgakv.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public by design; RLS is what protects the data |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server-side only.** Bypasses RLS entirely |
+| `DATABASE_URL` | Session pooler. Required — see below |
 
-Serverless works fine: realtime goes through Supabase's own WebSocket service, so there is no
-long-lived server to host.
+`DATABASE_URL` is not optional. The app holds a direct Postgres connection for transactions and
+per-staff advisory locks, which is what makes the concurrency guarantees work; PostgREST alone
+cannot express them.
 
----
+Two things about that URL worth not rediscovering the hard way:
+
+- **Session pooler (port 5432), not transaction pooler (6543).** Transaction pooling breaks
+  session-level advisory locks and postgres.js prepared statements.
+- **The password must be percent-encoded.** This project's contains `@` and `%`, which would
+  otherwise terminate the userinfo section and open an escape sequence. The direct host
+  (`db.<ref>.supabase.co`) is IPv6-only and unreachable from most IPv4 networks, which is the
+  other reason to use the pooler.
+
+To re-seed the hosted database at any point:
+
+```bash
+set -a; . ./.env.hosted; set +a
+pnpm exec tsx scripts/seed.ts
+```
+
+The seed is idempotent — existing auth users are reused rather than duplicated, so it can be run
+repeatedly without breaking logins.
 
 ## Documentation
 
