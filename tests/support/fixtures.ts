@@ -116,14 +116,55 @@ export async function assign(shiftId: string, staffId: string): Promise<{ id: st
   return row;
 }
 
-/** A fully-qualified staff member at one location: certified and skilled. */
+/**
+ * A fully-qualified staff member: certified, skilled, and (unless told
+ * otherwise) available around the clock so tests isolate one rule at a time.
+ */
 export async function createQualifiedStaff(options: {
   locationIds: string[];
   skillIds: string[];
   homeTimezone?: string;
+  desiredWeeklyHours?: number | null;
+  alwaysAvailable?: boolean;
 }) {
-  const staff = await createStaff({ homeTimezone: options.homeTimezone });
+  const staff = await createStaff({
+    homeTimezone: options.homeTimezone,
+    desiredWeeklyHours: options.desiredWeeklyHours,
+  });
   for (const locationId of options.locationIds) await certify(staff.id, locationId);
   for (const skillId of options.skillIds) await grantSkill(staff.id, skillId);
+  if (options.alwaysAvailable !== false) {
+    await setAlwaysAvailable(staff.id, options.homeTimezone);
+  }
   return staff;
+}
+
+/**
+ * Give a staff member round-the-clock availability.
+ *
+ * Most service-level tests are about a rule other than availability, and a
+ * staff member with NO availability rules is treated as unavailable (never as
+ * universally available), so tests must opt in explicitly.
+ */
+export async function setAlwaysAvailable(staffId: string, timezone = "America/Los_Angeles") {
+  for (const isoWeekday of [1, 2, 3, 4, 5, 6, 7]) {
+    await sql`
+      insert into availability_rules (staff_id, iso_weekday, start_minute, end_minute, timezone)
+      values (${staffId}, ${isoWeekday}, 0, 1440, ${timezone})
+    `;
+  }
+}
+
+/** Availability on one weekday only, as wall-clock minutes in `timezone`. */
+export async function setAvailability(
+  staffId: string,
+  windows: { isoWeekday: number; startMinute: number; endMinute: number }[],
+  timezone = "America/Los_Angeles",
+) {
+  for (const w of windows) {
+    await sql`
+      insert into availability_rules (staff_id, iso_weekday, start_minute, end_minute, timezone)
+      values (${staffId}, ${w.isoWeekday}, ${w.startMinute}, ${w.endMinute}, ${timezone})
+    `;
+  }
 }
