@@ -10,6 +10,7 @@ import {
   withdrawRequest,
   type SwapOutcome,
 } from "@/domain/swaps/service";
+import { assignStaffToShift, type AssignOutcome } from "@/domain/scheduling/assign";
 import { requireUser } from "@/lib/auth";
 
 /**
@@ -156,4 +157,26 @@ export async function removeAvailabilityException(exceptionId: string): Promise<
     delete from availability_exceptions where id = ${exceptionId} and staff_id = ${user.profileId}
   `;
   revalidatePath("/staff/availability");
+}
+
+/**
+ * Claim an UNFILLED published shift directly.
+ *
+ * DECISION (documented in DECISIONS.md): picking up an unfilled shift does not
+ * need manager approval, while taking over someone's dropped shift does. The
+ * asymmetry is deliberate -- a drop releases a person from an obligation, which
+ * a manager should see; an unfilled shift has no counterparty and is currently
+ * unstaffed, so coverage is strictly an improvement and making a manager
+ * approve it just slows down the exact situation the brief cares most about.
+ *
+ * The full rules engine still runs, so nobody can pick up a shift that would
+ * double-book them, breach their rest, or fall outside their availability.
+ */
+export async function pickUpOpenShift(shiftId: string): Promise<AssignOutcome> {
+  const user = await requireUser();
+  return assignStaffToShift({
+    actorId: user.profileId,
+    shiftId,
+    staffId: user.profileId,
+  });
 }

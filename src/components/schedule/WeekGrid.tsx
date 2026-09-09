@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { AssignPanel } from "./AssignPanel";
+import { NewShiftDialog, type SkillOption } from "./NewShiftDialog";
 
 export interface ShiftView {
   id: string;
@@ -31,14 +32,17 @@ export function WeekGrid({
   weekStartISO,
   timezone,
   locationId,
+  skills,
 }: {
   shifts: ShiftView[];
   weekStartISO: string;
   timezone: string;
   locationId: string;
+  skills: SkillOption[];
 }) {
   const router = useRouter();
   const [openShiftId, setOpenShiftId] = useState<string | null>(null);
+  const [newShiftDate, setNewShiftDate] = useState<string | null>(null);
   const [liveNotice, setLiveNotice] = useState<string | null>(null);
 
   // Live updates: another manager's change, or a swap approval, refreshes this
@@ -109,7 +113,22 @@ export function WeekGrid({
             >
               <header className="flex items-baseline justify-between mb-2 px-0.5">
                 <span className="text-xs font-semibold">{day.toFormat("ccc")}</span>
-                <span className="text-xs text-[var(--text-subtle)] tnum">{day.toFormat("d LLL")}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="text-xs text-[var(--text-subtle)] tnum">
+                    {day.toFormat("d LLL")}
+                  </span>
+                  {/* A generous hit target: the glyph is small, but a 24px
+                      box is what the pointer actually has to find. */}
+                  <button
+                    type="button"
+                    onClick={() => setNewShiftDate(day.toISODate())}
+                    className="-my-1 -mr-1 h-6 w-6 grid place-items-center rounded text-[var(--text-subtle)] hover:text-[var(--accent)] hover:bg-[var(--surface-sunken)] leading-none text-sm"
+                    aria-label={`Add a shift on ${day.toFormat("EEEE d LLLL")}`}
+                    title="Add a shift"
+                  >
+                    +
+                  </button>
+                </span>
               </header>
 
               {dayShifts.length === 0 ? (
@@ -138,6 +157,16 @@ export function WeekGrid({
           timezone={timezone}
           onClose={() => setOpenShiftId(null)}
           onChanged={() => router.refresh()}
+        />
+      ) : null}
+
+      {newShiftDate ? (
+        <NewShiftDialog
+          locationId={locationId}
+          timezone={timezone}
+          date={newShiftDate}
+          skills={skills}
+          onClose={() => setNewShiftDate(null)}
         />
       ) : null}
     </>

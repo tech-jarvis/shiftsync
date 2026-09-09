@@ -2,7 +2,12 @@
 
 import { DateTime } from "luxon";
 import { useEffect, useState, useTransition } from "react";
-import { assignAction, loadAssignmentOptions, releaseAction } from "@/app/(app)/schedule/actions";
+import {
+  assignAction,
+  loadAssignmentOptions,
+  releaseAction,
+  shiftHistory,
+} from "@/app/(app)/schedule/actions";
 import type { AssignmentOption } from "@/domain/scheduling/options";
 import type { Violation } from "@/rules/types";
 import { ViolationList } from "@/components/ViolationList";
@@ -40,6 +45,10 @@ export function AssignPanel({
   const [conflict, setConflict] = useState<Violation[] | null>(null);
   const [overrideFor, setOverrideFor] = useState<string | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
+  const [history, setHistory] = useState<
+    { occurredAt: string; actorName: string; entityType: string; action: string; changed: string[] }[] | null
+  >(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const refresh = () => {
@@ -231,6 +240,47 @@ export function AssignPanel({
                 ))}
               </ul>
             )}
+          </section>
+
+          <section>
+            <button
+              type="button"
+              onClick={() => {
+                setShowHistory((open) => !open);
+                if (history === null) shiftHistory(shift.id).then(setHistory).catch(() => setHistory([]));
+              }}
+              className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)]"
+              aria-expanded={showHistory}
+            >
+              {showHistory ? "Hide" : "Show"} change history
+            </button>
+
+            {showHistory ? (
+              history === null ? (
+                <p className="text-xs text-[var(--text-subtle)] mt-2">Loading…</p>
+              ) : history.length === 0 ? (
+                <p className="text-xs text-[var(--text-subtle)] mt-2">No recorded changes.</p>
+              ) : (
+                <ol className="mt-2 space-y-1.5">
+                  {history.map((entry, index) => (
+                    <li
+                      key={`${entry.occurredAt}-${index}`}
+                      className="text-[11px] leading-relaxed border-l-2 pl-2"
+                      style={{ borderColor: "var(--border-strong)" }}
+                    >
+                      <span className="tnum text-[var(--text-subtle)]">
+                        {DateTime.fromISO(entry.occurredAt).toFormat("d LLL HH:mm")}
+                      </span>{" "}
+                      <strong>{entry.actorName}</strong>{" "}
+                      <span className="text-[var(--text-muted)]">
+                        {entry.action}d {entry.entityType.replace(/s$/, "")}
+                        {entry.changed.length > 0 ? ` (${entry.changed.join(", ")})` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )
+            ) : null}
           </section>
         </div>
       </aside>

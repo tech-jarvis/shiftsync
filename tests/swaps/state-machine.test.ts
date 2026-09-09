@@ -31,7 +31,17 @@ afterAll(async () => {
 const inDays = (days: number, hour: number) =>
   DateTime.now().setZone("utc").plus({ days }).set({ hour, minute: 0, second: 0, millisecond: 0 });
 
-async function coverageSetup(options: { daysAhead?: number } = {}) {
+/**
+ * A shift a fixed number of hours from NOW.
+ *
+ * Used where the test is about a window relative to the present. Pinning an
+ * absolute hour-of-day instead makes the suite pass or fail depending on what
+ * time it is run, which is how a test suite stops being trusted.
+ */
+const inHours = (hours: number) =>
+  DateTime.now().setZone("utc").plus({ hours }).startOf("minute");
+
+async function coverageSetup(options: { daysAhead?: number; hoursAhead?: number } = {}) {
   const daysAhead = options.daysAhead ?? 10;
   const location = await createLocation("America/Los_Angeles");
   const skill = await createSkill("Bartender");
@@ -46,11 +56,16 @@ async function coverageSetup(options: { daysAhead?: number } = {}) {
   await sql`insert into manager_locations (manager_id, location_id)
             values (${manager.id}, ${location.id})`;
 
+  const start =
+    options.hoursAhead !== undefined ? inHours(options.hoursAhead) : inDays(daysAhead, 18);
+  const end =
+    options.hoursAhead !== undefined ? start.plus({ hours: 5 }) : inDays(daysAhead, 23);
+
   const shift = await createShift({
     locationId: location.id,
     skillId: skill.id,
-    startsAt: inDays(daysAhead, 18).toISO()!,
-    endsAt: inDays(daysAhead, 23).toISO()!,
+    startsAt: start.toISO()!,
+    endsAt: end.toISO()!,
     isPublished: true,
   });
 
@@ -257,8 +272,10 @@ describe("drop requests", () => {
   });
 
   it("refuses to open a drop inside the 24h expiry window", async () => {
-    // A shift 12 hours away: the offer would already have expired.
-    const { alice, assignment } = await coverageSetup({ daysAhead: 0 });
+    // Six hours from now: still in the future, so the "already started" guard
+    // does not fire, but inside the 24h window so the offer would be born
+    // expired. Relative to now, never an absolute hour-of-day.
+    const { alice, assignment } = await coverageSetup({ hoursAhead: 6 });
 
     const created = await requestDrop({ requesterId: alice.id, assignmentId: assignment.id });
     expect(created.status).toBe("rejected");

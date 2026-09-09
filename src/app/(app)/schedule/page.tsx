@@ -23,10 +23,10 @@ export default async function SchedulePage({
   const params = await searchParams;
   const supabase = await createClient();
 
-  const { data: allLocations } = await supabase
-    .from("locations")
-    .select("id, name, timezone")
-    .order("name");
+  const [{ data: allLocations }, { data: allSkills }] = await Promise.all([
+    supabase.from("locations").select("id, name, timezone").order("name"),
+    supabase.from("skills").select("id, name").order("name"),
+  ]);
 
   const locations = (allLocations ?? []).filter(
     (l) => user.role === "admin" || user.locationIds.includes(l.id),
@@ -183,6 +183,7 @@ export default async function SchedulePage({
         weekStartISO={weekStart.toISO()!}
         timezone={location.timezone}
         locationId={location.id}
+        skills={allSkills ?? []}
       />
     </div>
   );
