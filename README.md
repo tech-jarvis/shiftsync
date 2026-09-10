@@ -122,8 +122,9 @@ made in psql or Studio. An audit row you can forget to write is not an audit tra
 
 **Deployed: https://shiftsync-seven.vercel.app**
 
-The hosted Supabase backend is **live and seeded**: project `znitqahbagliydjhgakv`, region
-ap-southeast-2. All 9 migrations are applied, the seed has run, and it was verified end to end —
+The hosted Supabase backend is **live and seeded**: project `shiftsync-us`
+(`jdtxblaydfgwiichudfh`), region **us-east-1**, in the DEVQOD org. All 9 migrations are applied,
+the seed has run, and it was verified end to end —
 sign-in works, RLS scopes correctly (a manager sees only their locations; staff see published
 shifts at their certified locations and no drafts), and the exclusion constraint rejects an
 overlapping assignment with `SQLSTATE 23P01`.
@@ -137,7 +138,7 @@ across production, preview and development:
 
 | Variable | Notes |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://znitqahbagliydjhgakv.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://jdtxblaydfgwiichudfh.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public by design; RLS is what protects the data |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-side only.** Bypasses RLS entirely |
 | `DATABASE_URL` | Session pooler. Required — see below |
@@ -150,10 +151,10 @@ Two things about that URL worth not rediscovering the hard way:
 
 - **Session pooler (port 5432), not transaction pooler (6543).** Transaction pooling breaks
   session-level advisory locks and postgres.js prepared statements.
-- **The password must be percent-encoded.** This project's contains `@` and `%`, which would
-  otherwise terminate the userinfo section and open an escape sequence. The direct host
-  (`db.<ref>.supabase.co`) is IPv6-only and unreachable from most IPv4 networks, which is the
-  other reason to use the pooler.
+- **Percent-encode the password.** This one is alphanumeric by choice, precisely so no encoding
+  is needed — an earlier project's password contained `@` and `%`, which terminate the userinfo
+  section and open an escape sequence. The direct host (`db.<ref>.supabase.co`) is IPv6-only and
+  unreachable from most IPv4 networks, which is the other reason to use the pooler.
 
 To re-seed the hosted database at any point:
 
@@ -186,22 +187,27 @@ Measured against the hosted database:
 eighty round trips. It is now three queries total, helped by the fact that it evaluates a *single*
 person, whose assignments only need loading once across the whole span.
 
-**2. Compute and data on opposite sides of the planet.** Vercel defaults functions to `iad1`
-(Washington DC); the database is in `ap-southeast-2` (Sydney). Every query crossed ~16,000 km at
-roughly 230 ms, multiplied by the query count. `vercel.json` pins functions to `syd1`, which
-inverts the arithmetic: the viewer pays one slower hop, instead of the server paying N slow hops
-per page. Login went from 890 ms to 363 ms; authenticated pages settle around 330 ms.
+**2. Compute and data on opposite sides of the planet.** The database was originally in
+`ap-southeast-2` (Sydney) while Vercel defaults functions to `iad1` (Washington DC) — so every
+query crossed ~16,000 km at roughly 230 ms, multiplied by the query count.
+
+It is now a `us-east-1` database with functions pinned to `iad1` (`vercel.json`), which is the same
+AWS region: database round trips are intra-region rather than intercontinental, and a US-based
+reviewer is close to both.
+
+Assign panel, measured end to end in the browser from the same machine each time:
+
+| | Panel populated |
+|---|---|
+| iad1 functions + Sydney database, N+1 queries | ~10.9 s of database time alone |
+| after batching, functions moved to `syd1` | 2,394 ms |
+| after moving the database to `us-east-1` | **917 ms** |
 
 **Why not React Query?** It was considered and rejected on the evidence. Nearly all data here is
 fetched in server components and server actions, which a client-side cache never observes, and it
 cannot help a first load — which is exactly what an evaluator experiences. Moving these fetches
 client-side to make them cacheable would introduce a request waterfall in the browser and make the
 first paint *worse*. The bottleneck was round trips and distance, so that is what was fixed.
-
-**Still on the table:** the database is in Sydney because that is where the project was created,
-and Supabase cannot move a project between regions. A `us-east-1` project with functions back in
-`iad1` would put both hops next to a US-based reviewer. It is a fresh project plus a
-`db push` and a seed — roughly ten minutes, now that both are scripted.
 
 ## Documentation
 
