@@ -108,6 +108,12 @@ midnight.plus({ minutes: 540 })  ->  10:00   wrong
 wall-clock 09:00                 ->  09:00   right
 ```
 
+**Concurrent double-booking is refused two ways, and both are handled.** Racing inserts come back
+as either `23P01` (the exclusion constraint rejected it) or `40P01` (Postgres broke a mutual wait
+on the two speculative index rows by aborting one). Characterised over 30 real races: 23 gave
+`23P01`, 7 gave `40P01`, and **exactly one transaction committed every single time**. Both codes
+mean the same thing to a user, so both produce the same explanation rather than a raw error.
+
 **Authorization is RLS, and only RLS.** Policies are the single access layer, so a rule can't be
 forgotten in the seventeenth query touching shifts — and because Supabase Realtime evaluates the
 same policies, per-user event filtering comes free. Verified: Marcus sees only his 2 locations;

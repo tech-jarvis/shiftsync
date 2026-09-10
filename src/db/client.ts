@@ -33,6 +33,18 @@ export const PG_ERRORS = {
   CHECK_VIOLATION: "23514",
   /** raise_exception -- generic RAISE from a trigger without an explicit errcode. */
   RAISE_EXCEPTION: "P0001",
+  /**
+   * deadlock_detected -- the OTHER way a concurrent double-booking is refused.
+   *
+   * Two inserts arriving close enough together can each end up waiting on the
+   * other's speculative row in the GiST index; Postgres breaks the tie by
+   * aborting one as a deadlock instead of reporting the exclusion violation.
+   * Characterised over 30 races against a real database: 23 returned 23P01 and
+   * 7 returned 40P01, and in every single case exactly one transaction
+   * committed. Both codes mean the same thing to a user -- the database refused
+   * a conflicting concurrent write -- so both must be handled identically.
+   */
+  DEADLOCK_DETECTED: "40P01",
 } as const;
 
 export function isPgError(error: unknown, code: string): boolean {

@@ -166,7 +166,17 @@ export async function assignStaffToShift(params: AssignParams): Promise<AssignOu
     // A racing transaction committed between our validation and our insert. The
     // transaction is aborted, so the explanation is rebuilt on a fresh
     // connection rather than inside the dead one.
-    if (isPgError(error, PG_ERRORS.EXCLUSION_VIOLATION)) {
+    //
+    // Both codes are the same event seen from different angles: the exclusion
+    // constraint refused the write, or Postgres broke a mutual wait on the two
+    // speculative rows by aborting this one. The advisory lock makes the
+    // deadlock path unlikely here, but "unlikely" is not "handled" -- and an
+    // unhandled deadlock would surface to a manager as a raw database error
+    // instead of "someone else just booked them".
+    if (
+      isPgError(error, PG_ERRORS.EXCLUSION_VIOLATION) ||
+      isPgError(error, PG_ERRORS.DEADLOCK_DETECTED)
+    ) {
       return explainLostRace(params);
     }
 

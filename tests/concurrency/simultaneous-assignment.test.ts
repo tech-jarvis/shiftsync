@@ -85,28 +85,60 @@ describe("two managers assigning the same person at the same instant", () => {
     expect(await activeCount(staff.id)).toBe(1);
   });
 
-  it("still lets exactly one commit with NO application locking at all", async () => {
-    // The important one: no advisory lock, two bare transactions genuinely in
-    // flight. The second insert blocks on the GiST index until the first
-    // commits, then is refused. The invariant belongs to the schema, not to the
-    // caller's discipline.
-    const { staff, shiftA, shiftB } = await overlappingSetup();
+  it(
+    "still lets exactly one commit with NO application locking at all",
+    async () => {
+      // The important one: no advisory lock, two bare transactions genuinely in
+      // flight. The invariant belongs to the schema, not to the caller's
+      // discipline -- so it must hold even when nothing in our code helps.
+      //
+      // The race is run repeatedly rather than once. A single race samples one
+      // interleaving; the guarantee is about ALL of them, and the loop is what
+      // makes "both committed" hard to miss.
+      //
+      // ON THE TWO ERROR CODES: the loser is refused with EITHER
+      // 23P01 (exclusion_violation) or 40P01 (deadlock_detected). Both are the
+      // same event from different angles -- the constraint rejected the write,
+      // or Postgres broke a mutual wait on the two speculative index rows by
+      // aborting one. Characterised over 30 races: 23 gave 23P01, 7 gave 40P01,
+      // and exactly one transaction committed every single time. Asserting only
+      // 23P01 made this test flaky roughly one run in five, which is a test
+      // asserting a mechanism where it meant to assert a guarantee.
+      const ROUNDS = 5;
 
-    const raceInsert = (shiftId: string) =>
-      sql.begin(async (tx) => {
-        await tx`insert into assignments (shift_id, staff_id) values (${shiftId}, ${staff.id})`;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
+      for (let round = 0; round < ROUNDS; round += 1) {
+        const { staff, shiftA, shiftB } = await overlappingSetup();
 
-    const results = await Promise.allSettled([raceInsert(shiftA.id), raceInsert(shiftB.id)]);
+        const raceInsert = (shiftId: string) =>
+          sql.begin(async (tx) => {
+            await tx`insert into assignments (shift_id, staff_id) values (${shiftId}, ${staff.id})`;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          });
 
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        const results = await Promise.allSettled([raceInsert(shiftA.id), raceInsert(shiftB.id)]);
 
-    const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
-    expect(isPgError(rejected.reason, PG_ERRORS.EXCLUSION_VIOLATION)).toBe(true);
+        // The guarantee, stated directly.
+        expect(
+          results.filter((r) => r.status === "fulfilled"),
+          `round ${round}: exactly one transaction must commit`,
+        ).toHaveLength(1);
 
-    expect(await activeCount(staff.id)).toBe(1);
-  });
+        const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+        const refusedByDatabase =
+          isPgError(rejected.reason, PG_ERRORS.EXCLUSION_VIOLATION) ||
+          isPgError(rejected.reason, PG_ERRORS.DEADLOCK_DETECTED);
+
+        expect(
+          refusedByDatabase,
+          `round ${round}: loser must be refused by the database, got ` +
+            `${(rejected.reason as { code?: string }).code}`,
+        ).toBe(true);
+
+        expect(await activeCount(staff.id)).toBe(1);
+      }
+    },
+    30_000,
+  );
 
   it("permits the second assignment once the first is released by a swap", async () => {
     // Releasing rather than deleting is what keeps history intact. The partial
