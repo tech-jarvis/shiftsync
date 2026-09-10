@@ -183,7 +183,7 @@ function DecisionCard({ request }: { request: CoverageRequestView }) {
           disabled={pending}
           className="btn btn-primary text-xs"
         >
-          Approve
+          {pending ? "Approving\u2026" : "Approve"}
         </button>
         <button
           type="button"
@@ -191,7 +191,7 @@ function DecisionCard({ request }: { request: CoverageRequestView }) {
           disabled={pending}
           className="btn btn-danger text-xs"
         >
-          Decline
+          {pending ? "Declining\u2026" : "Decline"}
         </button>
       </div>
     </li>

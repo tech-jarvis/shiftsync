@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createShiftAction } from "@/app/(app)/schedule/actions";
+import { useOverlay } from "@/lib/useOverlay";
 
 export interface SkillOption {
   id: string;
@@ -27,6 +28,7 @@ export function NewShiftDialog({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useOverlay(onClose);
 
   const [skillId, setSkillId] = useState(skills[0]?.id ?? "");
   const [startTime, setStartTime] = useState("17:00");
@@ -55,13 +57,20 @@ export function NewShiftDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-black/40" onClick={onClose} />
+      {/* Click-catcher, not a control: a screen-sized "Close" button is noise
+          to a screen reader. Escape and Cancel are the keyboard routes out. */}
+      <div aria-hidden="true" className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       <div
-        className="relative card w-full max-w-sm p-4 shadow-2xl"
+        ref={dialogRef as React.RefObject<HTMLDivElement>}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-shift-title"
+        tabIndex={-1}
+        className="relative card w-full max-w-sm p-4 shadow-2xl outline-none"
         style={{ background: "var(--surface)" }}
       >
-        <h2 className="text-sm font-semibold">
+        <h2 id="new-shift-title" className="text-sm font-semibold">
           New shift · {DateTime.fromISO(date, { zone: timezone }).toFormat("EEE d LLL")}
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">
@@ -71,6 +80,7 @@ export function NewShiftDialog({
 
         {error ? (
           <p
+            role="alert"
             className="text-xs rounded-md px-2.5 py-2 mb-3 border"
             style={{ color: "var(--block)", background: "var(--block-soft)", borderColor: "var(--block)" }}
           >
@@ -138,7 +148,7 @@ export function NewShiftDialog({
             disabled={pending || !skillId}
             className="btn btn-primary text-xs"
           >
-            Create shift
+            {pending ? "Creating\u2026" : "Create shift"}
           </button>
           <button type="button" onClick={onClose} className="btn text-xs">
             Cancel

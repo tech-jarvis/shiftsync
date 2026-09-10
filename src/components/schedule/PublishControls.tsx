@@ -46,11 +46,13 @@ export function PublishControls({
           disabled={pending}
           className="btn btn-primary text-xs"
         >
-          Publish {unpublishedCount} draft{unpublishedCount === 1 ? "" : "s"}
+          {pending
+            ? "Publishing\u2026"
+            : `Publish ${unpublishedCount} draft${unpublishedCount === 1 ? "" : "s"}`}
         </button>
       ) : (
         <button type="button" onClick={() => run(false)} disabled={pending} className="btn text-xs">
-          Unpublish week
+          {pending ? "Unpublishing\u2026" : "Unpublish week"}
         </button>
       )}
     </div>

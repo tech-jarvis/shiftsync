@@ -79,25 +79,38 @@ export function OpenShifts({
 
   if (shifts.length === 0) {
     return (
-      <p className="text-sm text-[var(--text-subtle)]">
-        Nothing available to pick up right now.
-      </p>
+      <div className="card px-4 py-6 text-center">
+        <p className="text-sm font-medium">Nothing available right now</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1 max-w-md mx-auto">
+          Every published shift at your locations is either fully staffed or clashes with something
+          you are already working. Widening your availability makes more shifts eligible.
+        </p>
+        <a href="/staff/availability" className="btn text-xs mt-3">Update availability</a>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
       {message ? (
-        <p
-          className="card p-3 text-sm"
+        <div
+          className="card p-3 text-sm flex items-start gap-2"
           style={{
             borderColor: message.ok ? "var(--ok)" : "var(--block)",
             background: message.ok ? "var(--ok-soft)" : "var(--block-soft)",
           }}
           role="status"
         >
-          {message.text}
-        </p>
+          <span className="flex-1">{message.text}</span>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            aria-label="Dismiss message"
+            className="tap shrink-0 opacity-60 hover:opacity-100"
+          >
+            &times;
+          </button>
+        </div>
       ) : null}
 
       <ul className="space-y-2">
@@ -141,7 +154,7 @@ export function OpenShifts({
                   disabled={pending}
                   className="btn btn-primary text-xs shrink-0"
                 >
-                  {shift.requestId ? "Claim" : "Pick up"}
+                  {pending ? "Working\u2026" : shift.requestId ? "Claim" : "Pick up"}
                 </button>
               </div>
 

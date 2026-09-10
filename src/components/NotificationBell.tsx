@@ -59,6 +59,16 @@ export function NotificationBell({ profileId }: { profileId: string }) {
     };
   }, [profileId]);
 
+  // Escape closes the dropdown, matching the drawers elsewhere in the app.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   const unread = items.filter((item) => item.read_at === null).length;
 
   const markAllRead = async () => {
@@ -84,8 +94,9 @@ export function NotificationBell({ profileId }: { profileId: string }) {
         className="btn text-xs relative"
         aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
         aria-expanded={open}
+        aria-haspopup="true"
       >
-        Alerts
+        Notifications
         {unread > 0 ? (
           <span
             className="ml-1 tnum rounded-full px-1.5 text-[10px] font-bold"
@@ -98,12 +109,7 @@ export function NotificationBell({ profileId }: { profileId: string }) {
 
       {open ? (
         <>
-          <button
-            type="button"
-            aria-label="Close notifications"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setOpen(false)}
-          />
+          <div aria-hidden="true" className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute right-0 mt-2 w-[22rem] max-h-[70vh] overflow-y-auto card z-50 shadow-xl"
             style={{ boxShadow: "0 12px 32px rgba(0,0,0,0.18)" }}
@@ -121,8 +127,10 @@ export function NotificationBell({ profileId }: { profileId: string }) {
             </div>
 
             {items.length === 0 ? (
-              <p className="px-3 py-6 text-xs text-[var(--text-subtle)] text-center">
-                Nothing yet.
+              <p className="px-3 py-6 text-xs text-[var(--text-subtle)] text-center leading-relaxed">
+                No notifications yet.
+                <br />
+                Shift changes, swap requests and schedule publications appear here.
               </p>
             ) : (
               <ul>

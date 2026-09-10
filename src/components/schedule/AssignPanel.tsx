@@ -11,6 +11,7 @@ import {
 import type { AssignmentOption } from "@/domain/scheduling/options";
 import type { Violation } from "@/rules/types";
 import { ViolationList } from "@/components/ViolationList";
+import { useOverlay } from "@/lib/useOverlay";
 import type { ShiftView } from "./WeekGrid";
 
 /**
@@ -50,6 +51,7 @@ export function AssignPanel({
   >(null);
   const [showHistory, setShowHistory] = useState(false);
   const [pending, startTransition] = useTransition();
+  const panelRef = useOverlay(onClose);
 
   const refresh = () => {
     loadAssignmentOptions(shift.id)
@@ -113,15 +115,17 @@ export function AssignPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <button
-        type="button"
-        aria-label="Close panel"
-        className="flex-1 bg-black/40"
-        onClick={onClose}
-      />
+      {/* A click-catcher, not a control. Announcing a screen-sized "Close
+          panel" button to a screen reader is noise; Escape and the Close button
+          are the keyboard routes out. */}
+      <div aria-hidden="true" className="flex-1 bg-black/40" onClick={onClose} />
 
       <aside
-        className="w-full max-w-md h-full overflow-y-auto shadow-2xl"
+        ref={panelRef as React.RefObject<HTMLElement>}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        className="w-full max-w-md h-full overflow-y-auto shadow-2xl outline-none"
         style={{ background: "var(--surface)" }}
         aria-label="Assign staff to shift"
       >
@@ -154,17 +158,35 @@ export function AssignPanel({
 
         <div className="p-4 space-y-5">
           {error ? (
-            <p
-              className="text-xs rounded-md px-3 py-2 border"
+            <div
+              role="alert"
+              className="text-xs rounded-md px-3 py-2 border flex items-start gap-2"
               style={{ color: "var(--block)", background: "var(--block-soft)", borderColor: "var(--block)" }}
             >
-              {error}
-            </p>
+              <span className="flex-1">{error}</span>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                aria-label="Dismiss message"
+                className="shrink-0 opacity-70 hover:opacity-100"
+              >
+                &times;
+              </button>
+            </div>
           ) : null}
 
           {conflict ? (
-            <section>
-              <h3 className="text-xs font-semibold mb-1.5">That change was not saved</h3>
+            <section aria-live="polite">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <h3 className="text-xs font-semibold">That change was not saved</h3>
+                <button
+                  type="button"
+                  onClick={() => setConflict(null)}
+                  className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  Dismiss
+                </button>
+              </div>
               <ViolationList violations={conflict} />
             </section>
           ) : null}
@@ -200,7 +222,7 @@ export function AssignPanel({
                           disabled={pending}
                           className="btn btn-danger text-xs shrink-0"
                         >
-                          Remove
+                          {pending ? "Removing\u2026" : "Remove"}
                         </button>
                       ) : null}
                     </li>
@@ -216,7 +238,27 @@ export function AssignPanel({
             </h3>
 
             {options === null ? (
-              <p className="text-xs text-[var(--text-subtle)]">Checking everyone against the rules…</p>
+              <div aria-live="polite" aria-busy="true">
+                <p className="text-xs text-[var(--text-subtle)] mb-2">
+                  Checking everyone against the rules&hellip;
+                </p>
+                {/* Skeleton rows in the shape of the result, so the panel does
+                    not jump when the real list arrives. */}
+                <ul className="space-y-2" aria-hidden="true">
+                  {[0, 1, 2].map((i) => (
+                    <li key={i} className="card px-3 py-2.5">
+                      <div
+                        className="h-3.5 w-32 rounded animate-pulse"
+                        style={{ background: "var(--surface-sunken)" }}
+                      />
+                      <div
+                        className="h-2.5 w-48 rounded mt-2 animate-pulse"
+                        style={{ background: "var(--surface-sunken)" }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : candidates.length === 0 ? (
               <p className="text-xs text-[var(--text-subtle)]">
                 Nobody else holds the {shift.skillName} skill at this location.
@@ -340,7 +382,7 @@ function CandidateRow({
             disabled={pending}
             className={`btn text-xs shrink-0 ${person.violations.length === 0 ? "btn-primary" : ""}`}
           >
-            Assign
+            {pending ? "Assigning\u2026" : "Assign"}
           </button>
         ) : null}
       </div>
@@ -374,7 +416,7 @@ function CandidateRow({
               disabled={pending || overrideReason.trim().length < 10}
               className="btn btn-primary text-xs"
             >
-              Approve override
+              {pending ? "Saving\u2026" : "Approve override"}
             </button>
             <button type="button" onClick={onCancelOverride} className="btn text-xs">
               Cancel

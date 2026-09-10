@@ -138,6 +138,8 @@ export function AvailabilityEditor({
                       style={{ background: "var(--ok-soft)", color: "var(--ok)" }}
                     >
                       {minutesToLabel(rule.startMinute)}–{minutesToLabel(rule.endMinute)}
+                      {/* A 20px box around a 10px glyph: this is a phone
+                          target, and the badge text is not the thing to hit. */}
                       <button
                         type="button"
                         onClick={() =>
@@ -148,7 +150,7 @@ export function AvailabilityEditor({
                         }
                         disabled={pending}
                         aria-label={`Remove ${weekday.label} ${minutesToLabel(rule.startMinute)}`}
-                        className="ml-1 opacity-60 hover:opacity-100"
+                        className="tap -mr-1 ml-0.5 opacity-60 hover:opacity-100"
                       >
                         ×
                       </button>
@@ -205,7 +207,7 @@ export function AvailabilityEditor({
             Ends next day
           </label>
           <button type="button" onClick={addRule} disabled={pending} className="btn text-xs">
-            Add window
+            {pending ? "Adding\u2026" : "Add window"}
           </button>
         </div>
       </section>
@@ -250,8 +252,8 @@ export function AvailabilityEditor({
                     })
                   }
                   disabled={pending}
-                  className="opacity-60 hover:opacity-100 shrink-0"
-                  aria-label="Remove exception"
+                  className="tap opacity-60 hover:opacity-100 shrink-0"
+                  aria-label={`Remove exception on ${exception.date}`}
                 >
                   ×
                 </button>
@@ -317,7 +319,7 @@ export function AvailabilityEditor({
             />
           </label>
           <button type="button" onClick={addException} disabled={pending} className="btn text-xs">
-            Save
+            {pending ? "Saving\u2026" : "Save"}
           </button>
         </div>
       </section>

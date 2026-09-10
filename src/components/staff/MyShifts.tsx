@@ -84,16 +84,24 @@ export function MyShifts({
   return (
     <div className="space-y-5">
       {message ? (
-        <p
-          className="card p-3 text-sm"
+        <div
+          className="card p-3 text-sm flex items-start gap-2"
           style={{
             borderColor: message.ok ? "var(--ok)" : "var(--block)",
             background: message.ok ? "var(--ok-soft)" : "var(--block-soft)",
           }}
           role="status"
         >
-          {message.text}
-        </p>
+          <span className="flex-1">{message.text}</span>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            aria-label="Dismiss message"
+            className="tap shrink-0 opacity-60 hover:opacity-100"
+          >
+            &times;
+          </button>
+        </div>
       ) : null}
 
       {incoming.length > 0 ? (
@@ -139,7 +147,17 @@ export function MyShifts({
       <section>
         <h2 className="text-xs font-semibold mb-2 text-[var(--text-muted)]">Upcoming</h2>
         {shifts.length === 0 ? (
-          <p className="text-sm text-[var(--text-subtle)]">No upcoming shifts.</p>
+          <div className="card px-4 py-6 text-center">
+            <p className="text-sm font-medium">No upcoming shifts</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Once your manager publishes the schedule, your shifts appear here. In the meantime you
+              can pick up open shifts or update when you&rsquo;re available.
+            </p>
+            <div className="flex justify-center gap-2 mt-3">
+              <a href="/staff/open" className="btn text-xs">Browse open shifts</a>
+              <a href="/staff/availability" className="btn text-xs">Set availability</a>
+            </div>
+          </div>
         ) : (
           <ul className="space-y-2">
             {shifts.map((shift) => (
@@ -227,7 +245,7 @@ function ShiftRow({
             Ask someone
           </button>
           <button type="button" onClick={offerUp} disabled={pending} className="btn text-xs">
-            Offer up
+            {pending ? "Working\u2026" : "Offer up"}
           </button>
         </div>
       </div>
@@ -362,7 +380,7 @@ function MyRequest({
         </p>
       </div>
       <button type="button" onClick={withdraw} disabled={pending} className="btn text-xs shrink-0">
-        Withdraw
+        {pending ? "Withdrawing\u2026" : "Withdraw"}
       </button>
     </li>
   );

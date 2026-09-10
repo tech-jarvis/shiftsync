@@ -100,6 +100,22 @@ export function WeekGrid({
         </div>
       ) : null}
 
+      {shifts.length === 0 ? (
+        <div className="card px-4 py-8 text-center mb-3">
+          <p className="text-sm font-medium">No shifts scheduled this week</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1 mb-3 max-w-md mx-auto">
+            Add shifts with the + on any day, then publish the week to make it visible to staff.
+          </p>
+          <button
+            type="button"
+            onClick={() => setNewShiftDate(weekStart.toISODate())}
+            className="btn btn-primary text-xs"
+          >
+            Add the first shift
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2">
         {days.map((day) => {
           const dayShifts = shiftsOn(day);
@@ -122,7 +138,7 @@ export function WeekGrid({
                   <button
                     type="button"
                     onClick={() => setNewShiftDate(day.toISODate())}
-                    className="-my-1 -mr-1 h-6 w-6 grid place-items-center rounded text-[var(--text-subtle)] hover:text-[var(--accent)] hover:bg-[var(--surface-sunken)] leading-none text-sm"
+                    className="tap -my-1 -mr-1 text-[var(--text-subtle)] hover:text-[var(--accent)] leading-none text-sm"
                     aria-label={`Add a shift on ${day.toFormat("EEEE d LLLL")}`}
                     title="Add a shift"
                   >
